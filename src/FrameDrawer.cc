@@ -153,6 +153,27 @@ cv::Mat FrameDrawer::DrawFrame()
                 }
             }
         }//遍历所有的特征点
+        //draw 2D boxes on frame
+        for(auto &box : mpBoxes){
+            int index = box->id_ % 15;
+            cv::Point2f leftTop2D(box->left_top_2D_.x(), box->left_top_2D_.y());
+            cv::Point2f rightBottom2D(box->right_bottom_2D_.x(), box->right_bottom_2D_.y());
+
+            cv::rectangle(im, leftTop2D, rightBottom2D, 
+                cv::Scalar(mColors[index][0] * 255, mColors[index][1] * 255, mColors[index][2] * 255), 2);
+
+
+            // writting the object type on img
+            std::string text = box->obj_type_;
+            // Specify the position, font, color, and thickness of the text
+            cv::Point position(leftTop2D.x, leftTop2D.y - 2);  // Text position (x, y)
+            int fontFace = cv::FONT_HERSHEY_SIMPLEX;
+            double fontScale = 1.0;
+            cv::Scalar color(mColors[index][0] * 255, mColors[index][1] * 255, mColors[index][2] * 255);  // Text color in BGR format
+            int thickness = 2;  // Text thickness
+            // Write the text on the image
+            cv::putText(im, text, position, fontFace, fontScale, color, thickness);
+        }
     }
 
     //然后写入状态栏的信息
@@ -229,7 +250,8 @@ void FrameDrawer::Update(Tracking *pTracker)
 {
     unique_lock<mutex> lock(mMutex);
     //拷贝跟踪线程的图像
-    pTracker->mImGray.copyTo(mIm);
+    pTracker->mImColor.copyTo(mIm);
+    mpBoxes = pTracker->mCurrentFrame.mpBoxes;
     //拷贝跟踪线程的特征点
     mvCurrentKeys=pTracker->mCurrentFrame.mvKeys;
     N = mvCurrentKeys.size();

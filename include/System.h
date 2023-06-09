@@ -41,6 +41,7 @@
 #include "KeyFrameDatabase.h"
 #include "ORBVocabulary.h"
 #include "Viewer.h"
+#include "Box.h"
 
 namespace ORB_SLAM2
 {
@@ -84,6 +85,11 @@ public:
     cv::Mat TrackStereo(const cv::Mat &imLeft,          //左目图像
                         const cv::Mat &imRight,         //右目图像
                         const double &timestamp);       //时间戳
+
+    cv::Mat TrackStereoWithBoxes(const cv::Mat &imLeft,          //左目图像
+                                const cv::Mat &imRight,         //右目图像
+                                const double &timestamp,           //时间戳
+                                const vector<vector<double>> &boxes);       //3Dboxes
 
     // Process the given rgbd frame. Depthmap must be registered to the RGB frame.
     // Input image: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.

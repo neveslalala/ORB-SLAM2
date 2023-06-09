@@ -36,6 +36,7 @@
 #include "Tracking.h"
 #include "MapPoint.h"
 #include "Map.h"
+#include "Box.h"
 
 #include<opencv2/core/core.hpp>
 #include<opencv2/features2d/features2d.hpp>
@@ -75,6 +76,7 @@ public:
      * @return cv::Mat 返回绘制完成的图像,可以直接进行显示
      */
     cv::Mat DrawFrame();
+    cv::Mat DrawFrameWith2DBoxes();
 
 protected:
 
@@ -110,9 +112,28 @@ protected:
 
     ///地图指针
     Map* mpMap;
+    vector<Box*> mpBoxes;
 
     //线程锁
     std::mutex mMutex;
+
+    const float mColors[15][3] = {
+            {0, 0, 1.0},
+            {0, 1.0, 0},
+            {1.0, 0, 0},
+            {1.0, 1.0, 0},
+            {0.2, 1.0, 1.0},
+            {1.0, 0, 1.0},
+            {0.5, 0.5, 0.5},
+            {0, 0, 0.5},
+            {0, 0.5, 0},
+            {0.5, 0, 0},
+            {0.5, 0.5, 0},
+            {0.2, 0.5, 0.5},
+            {0.5, 0, 0.5},
+            {0.8, 0.2, 0.1},
+            {0, 0, 0}
+        };
 };
 
 } //namespace ORB_SLAM

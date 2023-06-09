@@ -42,10 +42,13 @@
 
 #include "Optimizer.h"
 #include "PnPsolver.h"
+#include "Box.h"
 
 #include <iostream>
 #include <cmath>
 #include <mutex>
+
+
 
 
 using namespace std;
@@ -156,6 +159,9 @@ Tracking::Tracking(
     else
         cout << "- color order: BGR (ignored if grayscale)" << endl;
 
+    // //load arguments
+    // int isObj = fSettings["Arg.isObj"];
+
     // Load ORB parameters
 
     // Step 2 加载ORB特征点有关的参数,并新建特征点提取器
@@ -244,6 +250,8 @@ cv::Mat Tracking::GrabImageStereo(
     const double &timestamp)        //时间戳
 {
     mImGray = imRectLeft;
+    mImColor = imRectLeft;
+
     cv::Mat imGrayRight = imRectRight;
 
     // step 1 ：将RGB或RGBA图像转为灰度图像
@@ -279,7 +287,7 @@ cv::Mat Tracking::GrabImageStereo(
     mCurrentFrame = Frame(
         mImGray,                //左目图像
         imGrayRight,            //右目图像
-        timestamp,              //时间戳
+        timestamp,              //时间戳             
         mpORBextractorLeft,     //左目特征提取器
         mpORBextractorRight,    //右目特征提取器
         mpORBVocabulary,        //字典
@@ -295,6 +303,107 @@ cv::Mat Tracking::GrabImageStereo(
     return mCurrentFrame.mTcw.clone();
 }
 
+cv::Mat Tracking::GrabImageStereoWithBoxes(
+    const cv::Mat &imRectLeft,      //左侧图像
+    const cv::Mat &imRectRight,     //右侧图像
+    const double &timestamp,        //时间戳
+    const vector<vector<double>> &boxes)    //3Dboxes    
+{
+    mImGray = imRectLeft;
+    mImColor = imRectLeft;
+
+    cv::Mat imGrayRight = imRectRight;
+    // cout << "1" << boxes[0][0] << endl;
+
+    // step 1 ：将RGB或RGBA图像转为灰度图像
+    if(mImGray.channels()==3)
+    {
+        if(mbRGB)
+        {
+            cvtColor(mImGray,mImGray,CV_RGB2GRAY);
+            cvtColor(imGrayRight,imGrayRight,CV_RGB2GRAY);
+        }
+        else
+        {
+            cvtColor(mImGray,mImGray,CV_BGR2GRAY);
+            cvtColor(imGrayRight,imGrayRight,CV_BGR2GRAY);
+        }
+    }
+    // 这里考虑得十分周全,甚至连四通道的图像都考虑到了
+    else if(mImGray.channels()==4)
+    {
+        if(mbRGB)
+        {
+            cvtColor(mImGray,mImGray,CV_RGBA2GRAY);
+            cvtColor(imGrayRight,imGrayRight,CV_RGBA2GRAY);
+        }
+        else
+        {
+            cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
+            cvtColor(imGrayRight,imGrayRight,CV_BGRA2GRAY);
+        }
+    }
+
+    //create boxes
+    vector<Box*> mpboxes;
+    double x1, x2, y1, y2;
+    string obj_type;
+    Eigen::Matrix<double, 2, 1> left_top_2D, right_bottom_2D;
+    Eigen::Matrix<double, 3, 1> center_3D;
+    
+    for(auto &box : boxes){
+
+        Box* mpbox = new Box;
+        mpbox->id_ = box[1] - 607 + 4;
+
+        if(box[2] == 0) mpbox->obj_type_ = "car";
+        if(box[2] == 1) mpbox->obj_type_ = "pedestrian";
+
+        x1 = box[6];
+        y1 = box[7];
+        left_top_2D.x() = x1;
+        left_top_2D.y() = y1;
+
+        x2 = box[8];
+        y2 = box[9];
+        right_bottom_2D.x() = x2;
+        right_bottom_2D.y() = y2;
+
+        mpbox->left_top_2D_ = left_top_2D;
+        mpbox->right_bottom_2D_ = right_bottom_2D;
+
+        mpbox->h_ = box[10];
+        mpbox->w_ = box[11];
+        mpbox->l_ = box[12]; 
+        center_3D.x() = box[13];
+        center_3D.y() = box[14];
+        center_3D.z() = box[15]; 
+        mpbox->center_3D_ = center_3D;
+        mpbox->direction_ = box[16];
+
+        mpboxes.push_back(mpbox);
+    }
+
+    // Step 2 ：构造Frame
+    mCurrentFrame = Frame(
+        mImGray,                //左目图像
+        imGrayRight,            //右目图像
+        timestamp,              //时间戳
+        mpboxes,                  //3Dboxes
+        mpORBextractorLeft,     //左目特征提取器
+        mpORBextractorRight,    //右目特征提取器
+        mpORBVocabulary,        //字典
+        mK,                     //内参矩阵
+        mDistCoef,              //去畸变参数
+        mbf,                    //基线长度
+        mThDepth);              //远点,近点的区分阈值
+
+    // Step 3 ：跟踪
+    Track();
+
+    //返回位姿
+    return mCurrentFrame.mTcw.clone();
+}
 // 输入左目RGB或RGBA图像和深度图
 // 1、将图像转为mImGray和imDepth并初始化mCurrentFrame
 // 2、进行tracking过程
@@ -664,6 +773,7 @@ void Tracking::Track()
 
             //更新显示中的位姿
             mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
+            mpMapDrawer->SetCurrentFrame3DBoxes(mCurrentFrame.mpBoxes);
 
             // Clean VO matches
             // Step 6：清除观测不到的地图点   

@@ -30,6 +30,9 @@ Camera.RGB: 1
 # Close/Far threshold. Baseline times.
 ThDepth: 35
 
+#arguments
+# Arg.isObj: 0
+
 #--------------------------------------------------------------------------------------------
 # ORB Parameters
 #--------------------------------------------------------------------------------------------
@@ -63,4 +66,9 @@ Viewer.ViewpointX: 0
 Viewer.ViewpointY: -100
 Viewer.ViewpointZ: -0.1
 Viewer.ViewpointF: 2000
+
+#./Examples/Stereo/stereo_kitti Vocabulary/ORBvoc.txt Examples/Stereo/KITTI00-02.yaml /home/neveszhang/Documents/slam/dataset_color/sequences/19
+# chmod +x build.sh
+# ./build.sh
+# ./Examples/Stereo/stereo_kitti Vocabulary/ORBvoc.txt Examples/Stereo/KITTI00-02.yaml /home/neveszhang/Documents/slam/dataset_color/sequences/19
 

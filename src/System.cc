@@ -232,6 +232,84 @@ cv::Mat System::TrackStereo(const cv::Mat &imLeft, 		//左侧图像
     return Tcw;
 }
 
+cv::Mat System::TrackStereoWithBoxes(const cv::Mat &imLeft, 
+                                     const cv::Mat &imRight, 
+                                     const double &timestamp, 
+                                     const vector<vector<double>> &boxes)
+{
+	//检查输入数据类型是否合法
+    if(mSensor!=STEREO)
+    {
+    	//不合法那就退出
+        cerr << "ERROR: you called TrackStereoWithBoxes but input sensor was not set to STEREO." << endl;
+        exit(-1);
+    }
+
+    //检查是否有运行模式的改变
+    // Check mode change
+    {
+    	// TODO 锁住这个变量？防止其他的线程对它的更改？
+        unique_lock<mutex> lock(mMutexMode);
+        //如果激活定位模式
+        if(mbActivateLocalizationMode)
+        {
+        	//调用局部建图器的请求停止函数
+            mpLocalMapper->RequestStop();
+
+            // Wait until Local Mapping has effectively stopped
+            while(!mpLocalMapper->isStopped())
+            {
+                usleep(1000);
+            }
+            //运行到这里的时候，局部建图部分就真正地停止了
+            //告知追踪器，现在 只有追踪工作
+            mpTracker->InformOnlyTracking(true);// 定位时，只跟踪
+            //同时清除定位标记
+            mbActivateLocalizationMode = false;// 防止重复执行
+        }//如果激活定位模式
+        if(mbDeactivateLocalizationMode)
+        {
+        	//如果取消定位模式
+        	//告知追踪器，现在地图构建部分也要开始工作了
+            mpTracker->InformOnlyTracking(false);
+            //局部建图器要开始工作呢
+            mpLocalMapper->Release();
+            //清楚标志
+            mbDeactivateLocalizationMode = false;// 防止重复执行
+        }//如果取消定位模式
+    }//检查是否有模式的改变
+
+    // Check reset，检查是否有复位的操作
+    {
+    	//上锁
+	    unique_lock<mutex> lock(mMutexReset);
+	    //是否有复位请求？
+	    if(mbReset)
+	    {
+	    	//有，追踪器复位
+	        mpTracker->Reset();
+	        //清除标志
+	        mbReset = false;
+	    }//是否有复位请求
+    }//检查是否有复位的操作
+// cout << "1" << endl;
+// cout <<"boxes.size()" <<boxes.size() << endl; //13
+    //用矩阵Tcw来保存估计的相机 位姿，运动追踪器的GrabImageStereo函数才是真正进行运动估计的函数
+    cv::Mat Tcw = mpTracker->GrabImageStereoWithBoxes(imLeft,imRight,timestamp, boxes);
+
+    //给运动追踪状态上锁
+    unique_lock<mutex> lock2(mMutexState);
+    //获取运动追踪状态
+    mTrackingState = mpTracker->mState;
+    //获取当前帧追踪到的地图点向量指针
+    mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
+    //获取当前帧追踪到的关键帧特征点向量的指针
+    mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
+    //返回获得的相机运动估计
+    return Tcw;
+}
+
+
 //当输入图像 为RGBD时进行的追踪，参数就不在一一说明了
 cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp)
 {

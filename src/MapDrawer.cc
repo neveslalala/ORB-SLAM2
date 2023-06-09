@@ -279,11 +279,155 @@ void MapDrawer::DrawCurrentCamera(pangolin::OpenGlMatrix &Twc)
     glPopMatrix();
 }
 
+void MapDrawer::Draw3DBoxes(pangolin::OpenGlMatrix &Twc)
+{
+    //百度搜索：glPushMatrix 百度百科
+    for (auto &box : mBoxes) {
+        glPushMatrix();
+
+        //将4*4的矩阵Twc.m右乘一个当前矩阵
+        //（由于使用了glPushMatrix函数，因此当前帧矩阵为世界坐标系下的单位矩阵）
+        //因为OpenGL中的矩阵为列优先存储，因此实际为Tcw，即相机在世界坐标下的位姿
+        //一个是整型,一个是浮点数类型
+    #ifdef HAVE_GLES
+            glMultMatrixf(Twc.m);
+    #else
+            glMultMatrixd(Twc.m);
+    #endif
+        auto id = box->id_;
+        int index = id % 15;
+
+        // for evaluation
+        // float index2 = fmod(box->id4eval_ , 15);
+        // if(index2 > int(index2) + 0.5) index2 ++;
+        // else index2 = int(index2);
+        // box->id4eval_ = index2;
+        // // index = index2;
+        // for evaluation**
+
+        const int line_width = 2.0;
+        Vec3 center_3D = box->center_3D_;
+        double h, w, l, X, Y, Z, rad;
+        // auto camera_translation = frame->pose_.inverse().translation();
+        // center_3D = frame->pose_.inverse().rotationMatrix() * center_3D;
+        
+        int n = 1 * 10;
+        
+        // X = center_3D.x() + camera_translation.x();
+        // Y = center_3D.y() + camera_translation.y();
+        // Z = center_3D.z() + camera_translation.z();
+        // int size = box->trajactory_optimized_.size();
+        // if(size < 3){
+
+        X = center_3D.x();
+        Y = center_3D.y();
+        Z = center_3D.z();
+        // }else{
+        //      X = box->trajactory_optimized_[size - 3].x();
+        //     Y = box->trajactory_optimized_[size - 3].y();      // glEnable(GL_DEPTH_TEST);
+        //     // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        //     // objModel_->setPath("../obj/new_car.obj");
+        //     Z = box->trajactory_optimized_[size - 3].z();
+
+            // //for evaluation
+            // X = box->trajactory_optimized_[size - n].x();
+            // Y = box->trajactory_optimized_[size - n].y();      // glEnable(GL_DEPTH_TEST);
+            // // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            // // objModel_->setPath("../obj/new_car.obj");
+            // Z = box->trajactory_optimized_[size - n].z();
+            // //for evaluation*
+        // }
+        h = box->h_;
+        w = box->w_;
+        l = box->l_;
+        Vec3 direction;
+        direction = box->head_direction_;
+
+
+        glColor3f(mColors[index][0], mColors[index][1], mColors[index][2]);
+        glLineWidth(line_width);
+
+        glBegin(GL_LINES);
+        glVertex3f(X - w / 2, Y + h / 2, Z - l / 2);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+        glVertex3f(X + w / 2, Y + h / 2, Z - l / 2);
+
+        glVertex3f(X - w / 2, Y + h / 2, Z - l / 2);
+        glVertex3f(X - w / 2, Y - h / 2, Z - l / 2);
+
+        glVertex3f(X - w / 2, Y + h / 2, Z - l / 2);
+        glVertex3f(X - w / 2, Y + h / 2, Z + l / 2);
+
+        glVertex3f(X + w / 2, Y + h / 2, Z + l / 2);
+        glVertex3f(X - w / 2, Y + h / 2, Z + l / 2);
+
+        glVertex3f(X + w / 2, Y + h / 2, Z + l / 2);
+        glVertex3f(X + w / 2, Y - h / 2, Z + l / 2);
+
+        glVertex3f(X + w / 2, Y + h / 2, Z + l / 2);
+        glVertex3f(X + w / 2, Y + h / 2, Z - l / 2);
+
+        glVertex3f(X - w / 2, Y - h / 2, Z + l / 2);
+        glVertex3f(X - w / 2, Y + h / 2, Z + l / 2);
+
+        glVertex3f(X - w / 2, Y - h / 2, Z + l / 2);
+        glVertex3f(X + w / 2, Y - h / 2, Z + l / 2);
+
+        glVertex3f(X - w / 2, Y - h / 2, Z + l / 2);
+        glVertex3f(X - w / 2, Y - h / 2, Z - l / 2);
+        
+        glVertex3f(X + w / 2, Y - h / 2, Z - l / 2);
+        glVertex3f(X - w / 2, Y - h / 2, Z - l / 2);
+
+        glVertex3f(X + w / 2, Y - h / 2, Z - l / 2);
+        glVertex3f(X + w / 2, Y + h / 2, Z - l / 2);
+
+        glVertex3f(X + w / 2, Y - h / 2, Z - l / 2);
+        glVertex3f(X + w / 2, Y - h / 2, Z + l / 2);
+
+        
+
+    
+
+    
+
+        // if(!box->isStatic_){
+
+        //     glVertex3f(X, Y, Z);
+
+        //     glVertex3f(direction.x() + X, direction.y() + Y, direction.z() + Z);
+
+        // }
+
+        
+        
+
+        glEnd();
+    glPopMatrix();
+    }
+
+           
+        // //draw center points
+        // glPointSize(5);
+        // glBegin(GL_POINTS);
+        
+        // glColor3f(colors_[index][0], colors_[index][1], colors_[index][2]);
+        // glVertex3d(X, Y, Z);
+        
+        // glEnd();
+}
+
 //设置当前帧相机的位姿, 设置这个函数是因为要处理多线程的操作
 void MapDrawer::SetCurrentCameraPose(const cv::Mat &Tcw)
 {
     unique_lock<mutex> lock(mMutexCamera);
     mCameraPose = Tcw.clone();
+}
+
+void MapDrawer::SetCurrentFrame3DBoxes(vector<Box*> boxes)
+{
+    // unique_lock<mutex> lock(mMutexBoxes);
+    // mCameraPose = Tcw.clone();
+    mBoxes = boxes;
 }
 
 // 将相机位姿mCameraPose由Mat类型转化为OpenGlMatrix类型

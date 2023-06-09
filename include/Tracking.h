@@ -96,6 +96,20 @@ public:
      */
     cv::Mat GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const double &timestamp);
 
+
+    // Preprocess the input and call Track(). Extract features and performs stereo matching.
+    // 下面的函数都是对不同的传感器输入的图像进行处理(转换成为灰度图像),并且调用Tracking线程
+    /**
+     * @brief 处理双目输入 with boxes
+     * 
+     * @param[in] imRectLeft    左目图像
+     * @param[in] imRectRight   右目图像
+     * @param[in] timestamp     时间戳
+     * @param[in] boxes     boxes
+     * @return cv::Mat          世界坐标系到该帧相机坐标系的变换矩阵
+     */
+    cv::Mat GrabImageStereoWithBoxes(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const double &timestamp, const vector<vector<double>> &boxes);
+
     /**
      * @brief 处理RGBD输入的图像
      * 
@@ -182,6 +196,7 @@ public:
     ///> 还有当前帧的灰度图像 //? 提问,那么在双目输入和在RGBD输入的时候呢? 
     ///>                        在双目输入和在RGBD输入时，为左侧图像的灰度图
     cv::Mat mImGray;
+    cv::Mat mImColor;
 
     // Initialization Variables (Monocular)
     // 初始化时前两帧相关变量

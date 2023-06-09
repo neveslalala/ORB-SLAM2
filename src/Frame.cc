@@ -32,6 +32,7 @@
 #include "Frame.h"
 #include "Converter.h"
 #include "ORBmatcher.h"
+#include "Box.h"
 #include <thread>
 
 namespace ORB_SLAM2
@@ -62,6 +63,7 @@ Frame::Frame(const Frame &frame)
      mpORBextractorLeft(frame.mpORBextractorLeft), 
      mpORBextractorRight(frame.mpORBextractorRight),
      mTimeStamp(frame.mTimeStamp), 
+     mpBoxes(frame.mpBoxes),
      mK(frame.mK.clone()),									//深拷贝
      mDistCoef(frame.mDistCoef.clone()),					//深拷贝
      mbf(frame.mbf), 
@@ -106,6 +108,7 @@ Frame::Frame(const Frame &frame)
 /**
  * @brief 为双目相机准备的构造函数
  * 
+ * @param[in] imLeftColor       左目图像
  * @param[in] imLeft            左目图像
  * @param[in] imRight           右目图像
  * @param[in] timeStamp         时间戳
@@ -204,6 +207,114 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
     // 将特征点分配到图像网格中 
     AssignFeaturesToGrid();    
 }
+
+/**
+ * @brief 为双目相机(with boxes)准备的构造函数
+ * 
+ * @param[in] imLeftColor       左目图像
+ * @param[in] imLeft            左目图像
+ * @param[in] imRight           右目图像
+ * @param[in] timeStamp         时间戳
+ * @param[in] boxes             3Dboxes
+ * @param[in] extractorLeft     左目图像特征点提取器句柄
+ * @param[in] extractorRight    右目图像特征点提取器句柄
+ * @param[in] voc               ORB字典句柄
+ * @param[in] K                 相机内参矩阵
+ * @param[in] distCoef          相机去畸变参数
+ * @param[in] bf                相机基线长度和焦距的乘积
+ * @param[in] thDepth           远点和近点的深度区分阈值
+ *  
+ */
+Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, 
+    const double &timeStamp, vector<Box*> boxes, ORBextractor* extractorLeft, ORBextractor* extractorRight, ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth)
+    :mpBoxes(boxes), mpORBvocabulary(voc),mpORBextractorLeft(extractorLeft),mpORBextractorRight(extractorRight), mTimeStamp(timeStamp), mK(K.clone()),mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),
+     mpReferenceKF(static_cast<KeyFrame*>(NULL))
+{
+    // Step 1 帧的ID 自增
+    mnId=nNextId++;
+
+    // Step 2 计算图像金字塔的参数 
+	//获取图像金字塔的层数
+    mnScaleLevels = mpORBextractorLeft->GetLevels();
+	//这个是获得层与层之前的缩放比
+    mfScaleFactor = mpORBextractorLeft->GetScaleFactor();
+	//计算上面缩放比的对数, NOTICE log=自然对数，log10=才是以10为基底的对数 
+    mfLogScaleFactor = log(mfScaleFactor);
+	//获取每层图像的缩放因子
+    mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
+	//同样获取每层图像缩放因子的倒数
+    mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
+	//高斯模糊的时候，使用的方差
+    mvLevelSigma2 = mpORBextractorLeft->GetScaleSigmaSquares();
+	//获取sigma^2的倒数
+    mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
+
+    // ORB extraction
+    // Step 3 对左目右目图像提取ORB特征点, 第一个参数0-左图， 1-右图。为加速计算，同时开了两个线程计算
+    thread threadLeft(&Frame::ExtractORB,		//该线程的主函数
+					  this,						//当前帧对象的对象指针
+					  0,						//表示是左图图像
+					  imLeft);					//图像数据
+	//对右目图像提取ORB特征，参数含义同上
+    thread threadRight(&Frame::ExtractORB,this,1,imRight);
+	//等待两张图像特征点提取过程完成
+    threadLeft.join();
+    threadRight.join();
+
+	//mvKeys中保存的是左图像中的特征点，这里是获取左侧图像中特征点的个数
+    N = mvKeys.size();
+
+	//如果左图像中没有成功提取到特征点那么就返回，也意味这这一帧的图像无法使用
+    if(mvKeys.empty())
+        return;
+	
+    // Step 4 用OpenCV的矫正函数、内参对提取到的特征点进行矫正
+    // 实际上由于双目输入的图像已经预先经过矫正,所以实际上并没有对特征点进行任何处理操作
+    UndistortKeyPoints();
+
+    // Step 5 计算双目间特征点的匹配，只有匹配成功的特征点会计算其深度,深度存放在 mvDepth 
+	// mvuRight中存储的应该是左图像中的点所匹配的在右图像中的点的横坐标（纵坐标相同）
+    ComputeStereoMatches();
+
+    // 初始化本帧的地图点
+    mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));   
+	// 记录地图点是否为外点，初始化均为外点false
+    mvbOutlier = vector<bool>(N,false);
+
+    // This is done only for the first Frame (or after a change in the calibration)
+	//  Step 5 计算去畸变后图像边界，将特征点分配到网格中。这个过程一般是在第一帧或者是相机标定参数发生变化之后进行
+    if(mbInitialComputations)
+    {
+		//计算去畸变后图像的边界
+        ComputeImageBounds(imLeft);
+
+		// 表示一个图像像素相当于多少个图像网格列（宽）
+        mfGridElementWidthInv=static_cast<float>(FRAME_GRID_COLS)/static_cast<float>(mnMaxX-mnMinX);
+		// 表示一个图像像素相当于多少个图像网格行（高）
+        mfGridElementHeightInv=static_cast<float>(FRAME_GRID_ROWS)/static_cast<float>(mnMaxY-mnMinY);
+
+		//给类的静态成员变量复制
+        fx = K.at<float>(0,0);
+        fy = K.at<float>(1,1);
+        cx = K.at<float>(0,2);
+        cy = K.at<float>(1,2);
+		// 猜测是因为这种除法计算需要的时间略长，所以这里直接存储了这个中间计算结果
+        invfx = 1.0f/fx;
+        invfy = 1.0f/fy;
+
+		//特殊的初始化过程完成，标志复位
+        mbInitialComputations=false;
+    }
+
+    // 双目相机基线长度
+    mb = mbf/fx;
+
+    // 将特征点分配到图像网格中 
+    AssignFeaturesToGrid();
+    mpBoxes = boxes;    
+}
+
+
 
 /**
  * @brief 为RGBD相机准备的帧构造函数

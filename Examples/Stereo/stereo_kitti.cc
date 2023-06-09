@@ -29,12 +29,17 @@
 
 #include<System.h>
 
+
+#include <boost/format.hpp>
+
 using namespace std;
 
 // 基本操作类似 stereo_euroc.cc
 
 void LoadImages(const string &strPathToSequence, vector<string> &vstrImageLeft,
                 vector<string> &vstrImageRight, vector<double> &vTimestamps);
+void LoadImagesWith3DBoxes(const string &strPathToSequence, vector<string> &vstrImageLeft,
+                vector<string> &vstrImageRight, vector<double> &vTimestamps, vector<vector<vector<double>>> &vstr3DBoxes);
 
 int main(int argc, char **argv)
 {
@@ -48,7 +53,11 @@ int main(int argc, char **argv)
     vector<string> vstrImageLeft;
     vector<string> vstrImageRight;
     vector<double> vTimestamps;
-    LoadImages(string(argv[3]), vstrImageLeft, vstrImageRight, vTimestamps);
+    vector<vector<vector<double>>> vstr3DBoxes;
+    // LoadImages(string(argv[3]), vstrImageLeft, vstrImageRight, vTimestamps);
+
+    cout << "loading images" << endl;
+    LoadImagesWith3DBoxes(string(argv[3]), vstrImageLeft, vstrImageRight, vTimestamps, vstr3DBoxes);
 
     const int nImages = vstrImageLeft.size();
 
@@ -73,6 +82,7 @@ int main(int argc, char **argv)
         imLeft = cv::imread(vstrImageLeft[ni],CV_LOAD_IMAGE_UNCHANGED);
         imRight = cv::imread(vstrImageRight[ni],CV_LOAD_IMAGE_UNCHANGED);
         double tframe = vTimestamps[ni];
+        vector<vector<double>> boxes = vstr3DBoxes[ni];
 
         if(imLeft.empty())
         {
@@ -88,7 +98,8 @@ int main(int argc, char **argv)
 #endif
 
         // Pass the images to the SLAM system
-        SLAM.TrackStereo(imLeft,imRight,tframe);
+        // SLAM.TrackStereo(imLeft,imRight,tframe);
+        SLAM.TrackStereoWithBoxes(imLeft,imRight,tframe, boxes);
 
 #ifdef COMPILEDWITHC11
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
@@ -133,6 +144,81 @@ int main(int argc, char **argv)
 }
 
 // 类似 mono_kitti.cc， 不过是生成了双目的图像路径
+void LoadImagesWith3DBoxes(const string &strPathToSequence, vector<string> &vstrImageLeft,
+                vector<string> &vstrImageRight, vector<double> &vTimestamps, vector<vector<vector<double>>> &vstr3DBoxes)
+{
+
+    ifstream fTimes;
+    string strPathTimeFile = strPathToSequence + "/times.txt";
+    fTimes.open(strPathTimeFile.c_str());
+    while(!fTimes.eof())
+    {
+        string s;
+        getline(fTimes,s);
+        if(!s.empty())
+        {
+            stringstream ss;
+            ss << s;
+            double t;
+            ss >> t;
+            vTimestamps.push_back(t);
+        }
+    }
+
+    string strPrefixLeft = strPathToSequence + "/image_2/";
+    string strPrefixRight = strPathToSequence + "/image_3/";
+
+    // string strPrefix3DBoxes = strPathToSequence + "/3Dboxes/";
+
+
+    const int nTimes = vTimestamps.size();
+    vstrImageLeft.resize(nTimes);
+    vstrImageRight.resize(nTimes);
+    vstr3DBoxes.resize(nTimes);
+
+
+    for(int i=0; i<nTimes; i++)
+    {
+        stringstream ss;
+        ss << setfill('0') << setw(6) << i;
+        vstrImageLeft[i] = strPrefixLeft + ss.str() + ".png";
+        vstrImageRight[i] = strPrefixRight + ss.str() + ".png";
+
+        boost::format fmt_3Dboxes("%s/3Dboxes/%d.txt");
+        ifstream file((fmt_3Dboxes % strPathToSequence % i ).str());
+        string line;
+
+        while (getline(file, line)){
+
+            if(line.size() == 0) break;
+            istringstream sin(line);
+            vector<string> line_info;
+			string info;
+            vector<double> mpbox;
+            mpbox.resize(17);
+ 
+			while (getline(sin, info, ' '))
+			{
+				line_info.push_back(info);
+			}
+
+            for(int j = 0 ; j < 17 ; j++){
+                if(j == 2){
+                    if(line_info[j] == "car"){
+                        mpbox[j] = 0;
+                    }else if (line_info[j] == "pedestrian"){
+                        mpbox[j] = 1;
+                    }
+                }else{
+                    mpbox[j] = std::stod(line_info[j]);
+                }
+            }
+            vstr3DBoxes[i].push_back(mpbox);
+        }
+    }
+}
+
+// 类似 mono_kitti.cc， 不过是生成了双目的图像路径
 void LoadImages(const string &strPathToSequence, vector<string> &vstrImageLeft,
                 vector<string> &vstrImageRight, vector<double> &vTimestamps)
 {
@@ -153,8 +239,9 @@ void LoadImages(const string &strPathToSequence, vector<string> &vstrImageLeft,
         }
     }
 
-    string strPrefixLeft = strPathToSequence + "/image_0/";
-    string strPrefixRight = strPathToSequence + "/image_1/";
+    string strPrefixLeft = strPathToSequence + "/image_2/";
+    string strPrefixRight = strPathToSequence + "/image_3/";
+
 
     const int nTimes = vTimestamps.size();
     vstrImageLeft.resize(nTimes);
@@ -168,3 +255,7 @@ void LoadImages(const string &strPathToSequence, vector<string> &vstrImageLeft,
         vstrImageRight[i] = strPrefixRight + ss.str() + ".png";
     }
 }
+
+
+// void Load3DBoxes(const string &strPathToSequence)
+

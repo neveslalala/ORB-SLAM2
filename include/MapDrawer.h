@@ -71,12 +71,22 @@ public:
      * @param[in] Twc 相机的位姿矩阵
      */
     void DrawCurrentCamera(pangolin::OpenGlMatrix &Twc);
+
+    /** @brief 绘制3D boxes */
+    void Draw3DBoxes(pangolin::OpenGlMatrix &Twc);
     /**
      * @brief 设置当前帧的相机位姿
      * 
      * @param[in] Tcw 位姿矩阵
      */
     void SetCurrentCameraPose(const cv::Mat &Tcw);
+
+    /**
+     * @brief 设置当前帧的相机位姿
+     * 
+     * @param[in] Tcw 位姿矩阵
+     */
+    void SetCurrentFrame3DBoxes(vector<Box*> boxes);
     /**
      * @brief 设置参考关键帧
      * 
@@ -108,9 +118,29 @@ private:
 
     ///相机位置
     cv::Mat mCameraPose;
+    vector<Box*> mBoxes;
 
     ///线程互斥量
     std::mutex mMutexCamera;
+    std::mutex mMutexBoxes;
+
+    const float mColors[15][3] = {
+            {0, 0, 1.0},
+            {0, 1.0, 0},
+            {1.0, 0, 0},
+            {1.0, 1.0, 0},
+            {0.2, 1.0, 1.0},
+            {1.0, 0, 1.0},
+            {0.5, 0.5, 0.5},
+            {0, 0, 0.5},
+            {0, 0.5, 0},
+            {0.5, 0, 0},
+            {0.5, 0.5, 0},
+            {0.2, 0.5, 0.5},
+            {0.5, 0, 0.5},
+            {0.8, 0.2, 0.1},
+            {0, 0, 0}
+        };
 };
 
 } //namespace ORB_SLAM
