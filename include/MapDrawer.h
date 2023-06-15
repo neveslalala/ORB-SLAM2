@@ -35,7 +35,9 @@
 #include"Map.h"
 #include"MapPoint.h"
 #include"KeyFrame.h"
+#include"Box.h"
 #include<pangolin/pangolin.h>
+#include "ObjModel.h"
 
 #include<mutex>
 
@@ -74,6 +76,12 @@ public:
 
     /** @brief 绘制3D boxes */
     void Draw3DBoxes(pangolin::OpenGlMatrix &Twc);
+    void DrawObjs(pangolin::OpenGlMatrix &Twc);
+
+    void DrawOriginalTrajectories();
+    void DrawOptimizedTrajectories();
+
+
     /**
      * @brief 设置当前帧的相机位姿
      * 
@@ -123,6 +131,9 @@ private:
     ///线程互斥量
     std::mutex mMutexCamera;
     std::mutex mMutexBoxes;
+
+    ObjModel mObjCar;
+    ObjModel mObjHuman;
 
     const float mColors[15][3] = {
             {0, 0, 1.0},

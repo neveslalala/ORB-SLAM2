@@ -31,13 +31,13 @@
 
 #include<vector>
 
+#include "Box.h"
 #include "MapPoint.h"
 #include "Thirdparty/DBoW2/DBoW2/BowVector.h"
 #include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
 #include "ORBVocabulary.h"
 #include "KeyFrame.h"
 #include "ORBextractor.h"
-#include "Box.h"
 
 #include <opencv2/opencv.hpp>
 
@@ -305,7 +305,9 @@ public:
     ///ORB特征提取器句柄,其中右侧的提取器句柄只会在双目输入的情况中才会被用到
     ORBextractor* mpORBextractorLeft, *mpORBextractorRight;
 
+
     vector<Box*> mpBoxes;
+    vector<Box*> mplastFrameBoxes; 
 
     // Frame timestamp.
     ///帧的时间戳

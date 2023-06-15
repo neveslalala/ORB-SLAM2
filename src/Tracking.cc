@@ -313,7 +313,6 @@ cv::Mat Tracking::GrabImageStereoWithBoxes(
     mImColor = imRectLeft;
 
     cv::Mat imGrayRight = imRectRight;
-    // cout << "1" << boxes[0][0] << endl;
 
     // step 1 ：将RGB或RGBA图像转为灰度图像
     if(mImGray.channels()==3)
@@ -748,9 +747,12 @@ void Tracking::Track()
             mState = OK;
         else
             mState=LOST;
-
+        
         // Step 4：更新显示线程中的图像、特征点、地图点等信息
+
+        SetBoxesTrajectorys();
         mpFrameDrawer->Update(this);
+        
 
         // If tracking were good, check if we insert a keyframe
         //只有在成功追踪时才考虑生成关键帧的问题
@@ -2433,6 +2435,235 @@ void Tracking::ChangeCalibration(const string &strSettingPath)
 void Tracking::InformOnlyTracking(const bool &flag)
 {
     mbOnlyTracking = flag;
+}
+
+void Tracking::SetBoxesTrajectorys(){
+    mCurrentFrame.mplastFrameBoxes = mLastFrame.mpBoxes;
+    auto cameraTranslation = mCurrentFrame.GetCameraCenter();
+    for (auto &currentFrameBox: mCurrentFrame.mpBoxes){
+        //initialize 
+        currentFrameBox->head_direction_.x() = 0;
+        currentFrameBox->head_direction_.y() = 0;
+        currentFrameBox->head_direction_.z() = 1;
+
+        currentFrameBox->predicted_direction_.x() = 0;
+        currentFrameBox->predicted_direction_.y() = 0;
+        currentFrameBox->predicted_direction_.z() = 1;
+
+        currentFrameBox->v_ = 0;
+        currentFrameBox->predicted_distance_ = 0;
+
+
+        Vec3 center = currentFrameBox->center_3D_;
+        double direct = currentFrameBox->direction_;
+
+        //if this is a new box
+        if(mptrajMap.find(currentFrameBox->id_) == mptrajMap.end()){
+
+            
+            //for Kalman filter
+            currentFrameBox->directions_.push_back(currentFrameBox->direction_);
+            // if(Config::Get<int>("isKalman")){
+            //     // cv::KalmanFilter KF;         // instantiate Kalman Filter
+            //     int nStates = 18;            // the number of states
+            //     int nMeasurements = 6;       // the number of measured states
+            //     int nInputs = 0;             // the number of action control
+            //     double dt = 0.01;
+            //     cv::Mat measurements(6, 1, CV_64F);           // time between measurements (1/FPS)
+            //             // time between measurements (1/FPS)
+            //     initKalmanFilter(currentFrameBox->KF_, nStates, nMeasurements, nInputs, dt);
+            //    cv::Mat translation_measured = (cv::Mat_<double>(3, 1) << 
+            //             center.x(), center.y(), center.z());              
+            //     cv::Mat rotation_measured = (cv::Mat_<double>(3, 1) << 0.0, direct, 0.0);
+                
+            //     // fill the measurements vector
+            //     fillMeasurements(measurements , translation_measured, rotation_measured);
+                
+            //     // Instantiate estimated translation and rotation
+            //     cv::Mat translation_estimated(3, 1, CV_64F);
+            //     cv::Mat rotation_estimated(3, 3, CV_64F);
+            //     // update the Kalman filter with good measurements
+            
+            //     updateKalmanFilter( currentFrameBox->KF_, measurements,
+            //             translation_estimated, rotation_estimated);
+                
+            //     center.x() = translation_estimated.at<double>(0);
+            //     center.y() = translation_estimated.at<double>(1);
+            //     center.z() = translation_estimated.at<double>(2);
+
+            //     KF_map_.insert(make_pair(currentFrameBox->id_, currentFrameBox->KF_));
+            // }
+
+            // auto camera_translation = current_frame_->pose_.inverse().translation();
+            // center = center * mCurrentFrame.mTcw
+            cv::Mat cvCenter =  Converter::toCvMat(center);
+
+
+            // Multiply the rotation matrix with the 3D point
+            cv::Mat transformedCenter = mCurrentFrame.GetRotationInverse() * cvCenter + mCurrentFrame.GetCameraCenter();
+
+            // Extract the transformed 3D point
+            cv::Point3f transformedCenterPoint(transformedCenter.at<float>(0, 0),
+                                        transformedCenter.at<float>(1, 0),
+                                        transformedCenter.at<float>(2, 0));
+
+
+
+            Vec3 eigenCenter(transformedCenterPoint.x, transformedCenterPoint.y, transformedCenterPoint.z);
+            // cout << "eigenCenter " << transformedCenterPoint.x << " " <<  transformedCenterPoint.y <<  " " << transformedCenterPoint.z << endl;
+
+            currentFrameBox->trajactory_.push_back(eigenCenter);
+            currentFrameBox->trajactory_optimized_.push_back(eigenCenter);
+            
+            mptrajMap.insert(make_pair(currentFrameBox->id_, currentFrameBox->trajactory_));
+            mpOptimizedTrajMap.insert(make_pair(currentFrameBox->id_, currentFrameBox->trajactory_));
+            // boxes_count_ ++;
+        }
+        //if this is a existed box
+        else{ 
+            for(auto &lastFrameBox: mCurrentFrame.mplastFrameBoxes){
+                if(currentFrameBox->id_ == lastFrameBox->id_){
+
+                    
+                    //in case the trajectory broke in the middle
+                    // if(lastFrameBox->trajactory_.size() == 0){
+                    //     lastFrameBox->trajactory_ = mptrajMap.find(currentFrameBox->id_)->second;
+                    // }
+                    currentFrameBox->trajactory_ = mptrajMap.find(currentFrameBox->id_)->second;
+                    currentFrameBox->trajactory_optimized_ = mpOptimizedTrajMap.find(currentFrameBox->id_)->second;
+                    // currentFrameBox->trajactory_optimized_ = lastFrameBox->trajactory_optimized_;
+
+
+                    //kalman filter
+                    // if(Config::Get<int>("isKalman") ){
+
+                    //     currentFrameBox->KF_ = KF_map_.find(currentFrameBox->id_)->second;
+                    //     cv::Mat measurements(6, 1, CV_64F);
+
+                    //     cv::Mat translation_measured = (cv::Mat_<double>(3, 1) << 
+                    //             center.x(), center.y(), center.z());
+                    //     // Get the measured rotation
+                    //     // cv::Mat rotation_measured(3, 3, CV_64F);
+                    //     // rotation_measured = pnp_detection.get_R_matrix();
+                       
+                    //     cv::Mat rotation_measured = (cv::Mat_<double>(3, 1) << 0.0, direct, 0.0);
+                     
+                    //     // fill the measurements vector
+                    //     fillMeasurements(measurements , translation_measured, rotation_measured);
+                      
+                    //     // Instantiate estimated translation and rotation
+                    //     cv::Mat translation_estimated(3, 1, CV_64F);
+                    //     cv::Mat rotation_estimated(3, 3, CV_64F);
+                    //     // update the Kalman filter with good measurements
+                    
+                    //     updateKalmanFilter( currentFrameBox->KF_, measurements,
+                    //             translation_estimated, rotation_estimated);
+                    //     KF_map_.find(currentFrameBox->id_)->second = currentFrameBox->KF_;
+                      
+
+                    //     center.x() = translation_estimated.at<double>(0);
+                    //     center.y() = translation_estimated.at<double>(1);
+                    //     center.z() = translation_estimated.at<double>(2);
+                    // }
+                    
+                   
+
+                    cv::Mat cvCenter =  Converter::toCvMat(center);
+                  
+
+                    // Multiply the rotation matrix with the 3D point
+                    cv::Mat transformedCenter = mCurrentFrame.GetRotationInverse() * cvCenter + mCurrentFrame.GetCameraCenter();
+
+                    // Extract the transformed 3D point
+                    cv::Point3f transformedCenterPoint(transformedCenter.at<float>(0, 0),
+                                                transformedCenter.at<float>(1, 0),
+                                                transformedCenter.at<float>(2, 0));
+
+                    Vec3 eigenCenter(transformedCenterPoint.x, transformedCenterPoint.y, transformedCenterPoint.z);
+
+                    
+                    currentFrameBox->trajactory_.push_back(eigenCenter);
+                    currentFrameBox->trajactory_optimized_.push_back(eigenCenter);
+
+                    
+                    mptrajMap.find(currentFrameBox->id_)->second = currentFrameBox->trajactory_;
+                    
+
+                    //7 points moving average smooth trajactory
+                    int size = currentFrameBox->trajactory_optimized_.size();
+
+                    if(size >= 3 && size <5 ){
+                        currentFrameBox->trajactory_optimized_[size - 2] = (currentFrameBox->trajactory_optimized_[size - 3] +
+                                                            currentFrameBox->trajactory_optimized_[size - 2] + 
+                                                            currentFrameBox->trajactory_optimized_[size - 1]) / 3;
+                    }
+                    if (size >= 5 && size <= 6){
+                        currentFrameBox->trajactory_optimized_[size - 3] = (currentFrameBox->trajactory_optimized_[size - 3] +
+                                                            currentFrameBox->trajactory_optimized_[size - 2] +
+                                                            currentFrameBox->trajactory_optimized_[size - 1] +
+                                                            currentFrameBox->trajactory_optimized_[size - 4] + 
+                                                            currentFrameBox->trajactory_optimized_[size - 5]) / 5;
+                        currentFrameBox->trajactory_optimized_[size - 2] = (currentFrameBox->trajactory_optimized_[size - 3] +
+                                                            currentFrameBox->trajactory_optimized_[size - 2] + 
+                                                            currentFrameBox->trajactory_optimized_[size - 1]) / 3;
+
+                    }
+                    if(size > 6 ){
+                        int num_points = mSmoothingParameter;
+                        if(size > (6 + num_points)){
+
+                            for(int i = num_points ; i >=0 ; i--){
+                                currentFrameBox->trajactory_optimized_[size - 4 - i] = (currentFrameBox->trajactory_optimized_[size - 4 - i] +
+                                                            currentFrameBox->trajactory_optimized_[size - 3 - i] +
+                                                            currentFrameBox->trajactory_optimized_[size - 2 - i] +
+                                                            currentFrameBox->trajactory_optimized_[size - 1 - i] +
+                                                            currentFrameBox->trajactory_optimized_[size - 5 - i] +
+                                                            currentFrameBox->trajactory_optimized_[size - 6 - i] + 
+                                                            currentFrameBox->trajactory_optimized_[size - 7 - i]) / 7;
+                            }
+
+                        }
+                        
+                        
+
+                        currentFrameBox->trajactory_optimized_[size - 4] = (currentFrameBox->trajactory_optimized_[size - 4] +
+                                                            currentFrameBox->trajactory_optimized_[size - 3] +
+                                                            currentFrameBox->trajactory_optimized_[size - 2] +
+                                                            currentFrameBox->trajactory_optimized_[size - 1] +
+                                                            currentFrameBox->trajactory_optimized_[size - 5] +
+                                                            currentFrameBox->trajactory_optimized_[size - 6] + 
+                                                            currentFrameBox->trajactory_optimized_[size - 7]) / 7;
+
+                        currentFrameBox->trajactory_optimized_[size - 3] = (currentFrameBox->trajactory_optimized_[size - 3] +
+                                                            currentFrameBox->trajactory_optimized_[size - 2] +
+                                                            currentFrameBox->trajactory_optimized_[size - 1] +
+                                                            currentFrameBox->trajactory_optimized_[size - 4] + 
+                                                            currentFrameBox->trajactory_optimized_[size - 5]) / 5;
+                        currentFrameBox->trajactory_optimized_[size - 2] = (currentFrameBox->trajactory_optimized_[size - 3] +
+                                                            currentFrameBox->trajactory_optimized_[size - 2] + 
+                                                            currentFrameBox->trajactory_optimized_[size - 1]) / 3;
+
+                    }
+
+                    mpOptimizedTrajMap.find(currentFrameBox->id_)->second = currentFrameBox->trajactory_optimized_;
+
+
+                    
+                    
+                    // double t = Config::Get<double>("t");
+                    if(size >20 - mt*10){ //20帧就是2s 预测帧我们使用第四帧 因为前三帧晃动幅度较大
+                        
+                        currentFrameBox->PredictTrajactory(mt);
+
+                        // SmothingV(currentFrameBox);
+
+                    }      
+                    break;
+                }
+            }
+        }
+
+    }
 }
 
 } //namespace ORB_SLAM

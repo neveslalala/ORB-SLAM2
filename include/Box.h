@@ -1,7 +1,10 @@
-//
-// Created by Qi on 22-10-13.
-//
-
+/**
+ * @file Box.h
+ * @author Qi
+ * @brief ORB-SLAM2 中，帧的实现
+ * @version 0.1
+ * @date 2023-06-12 
+ */
 
 #ifndef BOX_H
 #define BOX_H
@@ -13,7 +16,8 @@
 
 
 #include <opencv2/features2d.hpp>
-#include "MapPoint.h"
+// #include "MapPoint.h"
+// #include "Frame.h"
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -25,8 +29,6 @@ typedef Eigen::Matrix<double, 3, 1> Vec3;
 typedef Eigen::Matrix<double, 2, 1> Vec2;
 
 
-struct Frame;
-struct MapPoint;
 
 /**
  * 有一个新帧的时候关联一个boxes
@@ -34,7 +36,7 @@ struct MapPoint;
 struct Box{
    public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-
+    // typedef std::shared_ptr<Box> Ptr;
     
 
 //     std::weak_ptr<Frame> first_frame_;         // 持有该box的frame
@@ -58,6 +60,8 @@ struct Box{
     Vec3 predicted_direction_;
     Vec3 filtered_predicted_direction;   //Kalman
     double predicted_distance_;
+
+    double mt;
 
     double v_, a_, aa_;  //每一个物体的速度，加速度，加速度的加速度
     bool isStatic_ = false;
@@ -90,13 +94,14 @@ struct Box{
             h_(h), w_(w), l_(l), center_3D_(center_3D), direction_(direction){}
 
     void Setvaaa();
-    void PredictTrajactory();
+    void PredictTrajactory(int t);
     void CalculateDistance();
     void CalculateHeadDirection();
     void CalculatePredictedDirection();
 
     Vec3 normalize(Vec3 vector);
     double angle(Vec3 vector);
+    double calculateRad(Vec3 vector1, Vec3 vector2);
  
 
     };

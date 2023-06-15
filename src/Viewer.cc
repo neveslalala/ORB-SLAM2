@@ -98,6 +98,10 @@ void Viewer::Run()
     pangolin::Var<bool> menuShowGraph("menu.Show Graph",true,true);
     pangolin::Var<bool> menuLocalizationMode("menu.Localization Mode",false,true);
     pangolin::Var<bool> menuShow3Dboxes("menu.Show 3D boxes",true,true);
+    pangolin::Var<bool> menuShowObjs("menu.Show 3D boxes",true,true);
+    pangolin::Var<bool> menuShowOriginalTrajectories("menu.Show Original Trajectories",true,true);
+    pangolin::Var<bool> menuShowOptimizedTrajectories("menu.Show Optimized Trajectories",false,true);
+
     pangolin::Var<bool> menuReset("menu.Reset",false,false);
 
     // Define Camera Render Object (for view / scene browsing)
@@ -187,6 +191,15 @@ void Viewer::Run()
         }
         if(menuShow3Dboxes){
             mpMapDrawer->Draw3DBoxes(Twc);
+        }
+        if(menuShowObjs){
+            mpMapDrawer->DrawObjs(Twc);
+        }
+        if(menuShowOriginalTrajectories){
+            mpMapDrawer->DrawOriginalTrajectories();
+        }
+        if(menuShowOptimizedTrajectories){
+            mpMapDrawer->DrawOptimizedTrajectories();
         }
 
         pangolin::FinishFrame();

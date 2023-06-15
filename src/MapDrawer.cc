@@ -51,6 +51,12 @@ MapDrawer::MapDrawer(Map* pMap, const string &strSettingPath):mpMap(pMap)
     mPointSize = fSettings["Viewer.PointSize"];
     mCameraSize = fSettings["Viewer.CameraSize"];
     mCameraLineWidth = fSettings["Viewer.CameraLineWidth"];
+    
+    mObjCar = ObjModel("/home/neveszhang/Documents/slam/ORB_SLAM2/obj/new_car.obj");
+    mObjCar.Filter(20);
+
+    mObjHuman = ObjModel("/home/neveszhang/Documents/slam/ORB_SLAM2/obj/human.obj");
+    mObjHuman.Filter(10);
 
 }
 
@@ -326,14 +332,14 @@ void MapDrawer::Draw3DBoxes(pangolin::OpenGlMatrix &Twc)
         //      X = box->trajactory_optimized_[size - 3].x();
         //     Y = box->trajactory_optimized_[size - 3].y();      // glEnable(GL_DEPTH_TEST);
         //     // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        //     // objModel_->setPath("../obj/new_car.obj");
+        //     // ObjModel_->setPath("../obj/new_car.obj");
         //     Z = box->trajactory_optimized_[size - 3].z();
 
             // //for evaluation
             // X = box->trajactory_optimized_[size - n].x();
             // Y = box->trajactory_optimized_[size - n].y();      // glEnable(GL_DEPTH_TEST);
             // // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            // // objModel_->setPath("../obj/new_car.obj");
+            // // ObjModel_->setPath("../obj/new_car.obj");
             // Z = box->trajactory_optimized_[size - n].z();
             // //for evaluation*
         // }
@@ -384,36 +390,129 @@ void MapDrawer::Draw3DBoxes(pangolin::OpenGlMatrix &Twc)
         glVertex3f(X + w / 2, Y - h / 2, Z - l / 2);
         glVertex3f(X + w / 2, Y - h / 2, Z + l / 2);
 
-        
-
-    
-
-    
-
-        // if(!box->isStatic_){
-
-        //     glVertex3f(X, Y, Z);
-
-        //     glVertex3f(direction.x() + X, direction.y() + Y, direction.z() + Z);
-
-        // }
-
-        
-        
 
         glEnd();
     glPopMatrix();
     }
+}
+void MapDrawer::DrawObjs(pangolin::OpenGlMatrix &Twc)
+{
+    //百度搜索：glPushMatrix 百度百科
+    for (auto &box : mBoxes) {
+        glPushMatrix();
 
-           
-        // //draw center points
-        // glPointSize(5);
-        // glBegin(GL_POINTS);
+        //将4*4的矩阵Twc.m右乘一个当前矩阵
+        //（由于使用了glPushMatrix函数，因此当前帧矩阵为世界坐标系下的单位矩阵）
+        //因为OpenGL中的矩阵为列优先存储，因此实际为Tcw，即相机在世界坐标下的位姿
+        //一个是整型,一个是浮点数类型
+    #ifdef HAVE_GLES
+            glMultMatrixf(Twc.m);
+    #else
+            glMultMatrixd(Twc.m);
+    #endif
+        auto id = box->id_;
+        int index = id % 15;
+
+        const int line_width = 2.0;
+        Vec3 center_3D = box->center_3D_;
+        double h, w, l, X, Y, Z, rad;
+        int n = 1 * 10;
+
+        X = center_3D.x();
+        Y = center_3D.y();
+        Z = center_3D.z();
+        h = box->h_;
+        w = box->w_;
+        l = box->l_;
+        Vec3 direction;
+        direction = box->head_direction_;
+
+        glTranslatef(X, Y, Z);
+        glColor3f(mColors[index][0], mColors[index][1], mColors[index][2]);
+        glLineWidth(line_width);
+        float cosa = box->head_direction_.x();
+        double angle = acos(cosa); 
+        if(box->head_direction_.z() < 0) angle = -angle;
+        angle = angle * 180 / 3.1415 - 90;
+
+        if(box->obj_type_== "car"){
+            mObjCar.ObjDrawCar(angle);
+        }else if (box->obj_type_== "pedestrian")
+        {
+            mObjHuman.ObjDrawHuman(angle);
+        }
         
-        // glColor3f(colors_[index][0], colors_[index][1], colors_[index][2]);
-        // glVertex3d(X, Y, Z);
+        glPopMatrix();
+        glEnd();
+    }
+}
+
+void MapDrawer::DrawOriginalTrajectories()
+{
+    for (auto &box : mBoxes) {
+        // glPushMatrix();
+    
+        auto id = box->id_;
+        int index = id % 15;
+
+        const int line_width = 2.0;
         
-        // glEnd();
+        int n = 1 * 10;
+ 
+        glColor3f(mColors[index][0], mColors[index][1], mColors[index][2]);
+        glLineWidth(line_width);
+
+        glBegin(GL_LINES);
+        // if(!box->isStatic_ ){
+            
+        if(box->trajactory_.size() > 1){
+            
+            for(int i = 0 ; i < box->trajactory_optimized_.size() - 1 ; i++){
+                glVertex3f(box->trajactory_[i].x(), box->trajactory_[i].y() + 1, box->trajactory_[i].z() );
+                glVertex3f(box->trajactory_[i+1].x(), box->trajactory_[i+1].y() + 1, box->trajactory_[i+1].z() );               
+            }    
+        }
+
+        // }
+        
+
+        glEnd();
+        // glPopMatrix();
+    }
+}
+
+void MapDrawer::DrawOptimizedTrajectories()
+{
+    for (auto &box : mBoxes) {
+        // glPushMatrix();
+    
+        auto id = box->id_;
+        int index = id % 15;
+
+        const int line_width = 2.0;
+        
+        int n = 1 * 10;
+ 
+        glColor3f(mColors[index][0], mColors[index][1], mColors[index][2]);
+        glLineWidth(line_width);
+
+        glBegin(GL_LINES);
+        // if(!box->isStatic_ ){
+            
+        if(box->trajactory_.size() > 1){
+            
+            for(int i = 0 ; i < box->trajactory_optimized_.size() - 1 ; i++){
+                glVertex3f(box->trajactory_optimized_[i].x(), box->trajactory_optimized_[i].y() + 1, box->trajactory_optimized_[i].z() );
+                glVertex3f(box->trajactory_optimized_[i+1].x(), box->trajactory_optimized_[i+1].y() + 1, box->trajactory_optimized_[i+1].z() );               
+            }    
+        }
+
+        // }
+        
+
+        glEnd();
+        // glPopMatrix();
+    }
 }
 
 //设置当前帧相机的位姿, 设置这个函数是因为要处理多线程的操作

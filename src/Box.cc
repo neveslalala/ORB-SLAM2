@@ -11,7 +11,7 @@ namespace ORB_SLAM2 {
 
 
 
-void Box::PredictTrajactory(){
+void Box::PredictTrajactory(int t){
 
     /* bazier curve
         1. Calculate v and a to get predicted distance.
@@ -20,19 +20,17 @@ void Box::PredictTrajactory(){
         4. Calculate curve extend (here use half norm).   */
     //initialize 
     v_ = 0;
+    mt = double(t);
     
     Setvaaa();
     CalculateHeadDirection();
     CalculatePredictedDirection();
-    CalculateDistance();
-
-    
-    
+    CalculateDistance(); 
 }
 
 
 void Box::Setvaaa(){
-    int n = Config::Get<int>("t") * 10;
+    int n = mt * 10;
     int size = trajactory_optimized_.size();
     
     Vec3 point1 = trajactory_optimized_[size - 1];
@@ -79,7 +77,7 @@ void Box::Setvaaa(){
 
 void Box::CalculateDistance(){
 
-    double t = Config::Get<double>("t");
+    double t = mt;
     // int size = trajactory_optimized_.size();
     // double t = 2;
     // predicted_distance_ = abs(v_ * t);
@@ -102,7 +100,7 @@ void Box::CalculateDistance(){
 
 void Box::CalculateHeadDirection(){
   
-    int n = Config::Get<int>("t") * 10;
+    int n = mt * 10;
     
 
     int size = trajactory_optimized_.size();
@@ -132,28 +130,28 @@ void Box::CalculateHeadDirection(){
             sqrt(pow((normalize_norm_vector.x()), 2) + pow((normalize_norm_vector.z()), 2)) * 
             sqrt(pow((direction.x()), 2) + pow((direction.z()), 2))) > 0){
         head_direction_ = normalize_norm_vector;
-        std::cout << head_direction_.x() << " " << head_direction_.y() << " " <<head_direction_.z() << std::endl;
+        // std::cout << head_direction_.x() << " " << head_direction_.y() << " " <<head_direction_.z() << std::endl;
         
         head_direction_ = normalize(head_direction_);
-        std::cout << head_direction_.x() << " " << head_direction_.y() << " " <<head_direction_.z() << std::endl;
+        // std::cout << head_direction_.x() << " " << head_direction_.y() << " " <<head_direction_.z() << std::endl;
     }
     else{
         //预测的方向是前进方向法向量和3Dbox方向向量的权重加法。（这里的权重是1：1）
         head_direction_ = 0.000001 * direction + 0.99 * normalize_norm_vector;
-        std::cout << head_direction_.x() << " " << head_direction_.y() << " " <<head_direction_.z() << std::endl;
+        // std::cout << head_direction_.x() << " " << head_direction_.y() << " " <<head_direction_.z() << std::endl;
 
         //normalize predicted direction
         head_direction_ = normalize(head_direction_);
-        std::cout << head_direction_.x() << " " << head_direction_.y() << " " <<head_direction_.z() << std::endl;
+        // std::cout << head_direction_.x() << " " << head_direction_.y() << " " <<head_direction_.z() << std::endl;
 
     }
     
 }
 
 void Box::CalculatePredictedDirection(){
-    double t = Config::Get<double>("t");
+    double t = mt;
     int size = trajactory_optimized_.size();
-    int n = Config::Get<int>("t") * 10;
+    int n = t * 10;
 
     if(size < 20){
     // //for evaluation 
@@ -245,6 +243,12 @@ double Box::angle(Vec3 vector){
         angle = acos(vector.x() / sqrt(pow((vector.x()), 2) + pow((vector.z()), 2)));
     }
     return angle;
+}
+
+double Box::calculateRad(Vec3 vector1, Vec3 vector2){
+    double rad;
+    rad = acos(vector1.x() * vector2.x() + vector1.z() * vector2.z());
+    return rad;
 }
 
 

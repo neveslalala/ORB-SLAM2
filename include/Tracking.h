@@ -48,6 +48,7 @@
 #include "Initializer.h"
 #include "MapDrawer.h"
 #include "System.h"
+#include "Box.h"
 
 #include <mutex>
 
@@ -168,6 +169,8 @@ public:
      */
     void InformOnlyTracking(const bool &flag);
 
+    void SetBoxesTrajectorys();
+
 
 public:
 
@@ -230,6 +233,12 @@ public:
      * @brief 整个系统进行复位操作
      */
     void Reset();
+
+    std::map<unsigned long, std::vector<Vec3>> mptrajMap;
+    std::map<unsigned long, std::vector<Vec3>> mpOptimizedTrajMap;
+
+    int mSmoothingParameter = 15;
+    int mt = 2;
 
 protected:
 
@@ -449,6 +458,9 @@ protected:
 
     ///临时的地图点,用于提高双目和RGBD摄像头的帧间效果,用完之后就扔了
     list<MapPoint*> mlpTemporalPoints;
+
+
+
 };  //class Tracking
 
 } //namespace ORB_SLAM

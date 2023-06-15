@@ -52,6 +52,7 @@ add_library(${PROJECT_NAME} SHARED
 src/System.cc
 src/Tracking.cc
 src/LocalMapping.cc
+src/Box.cc
 src/LoopClosing.cc
 src/ORBextractor.cc
 src/ORBmatcher.cc
@@ -68,6 +69,7 @@ src/KeyFrameDatabase.cc
 src/Sim3Solver.cc
 src/Initializer.cc
 src/Viewer.cc
+src/ObjModel.cc
 )
 
 target_link_libraries(${PROJECT_NAME}
